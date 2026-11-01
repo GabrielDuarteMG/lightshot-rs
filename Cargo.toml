@@ -1,0 +1,20 @@
+[package]
+name = "lightshot"
+version = "0.1.0"
+edition = "2021"
+authors = ["Gabriel"]
+license = "MIT"
+repository = "https://github.com/GabrielDuarteMG/lightshot-rs"
+
+[dependencies]
+eframe = "0.37"
+xcap = "0.9"
+arboard = { version = "3.7", default-features = false, features = ["image-data", "wayland-data-control"] }
+image = "0.25"
+imageproc = "0.25"
+ab_glyph = "0.2"
+rfd = "0.16"
+serde = { version = "1", features = ["derive"] }
+toml = "1"
+notify-rust = "4"
+libc = "0.2"
