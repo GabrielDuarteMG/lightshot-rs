@@ -73,11 +73,13 @@ impl Config {
 }
 
 fn home() -> Option<PathBuf> {
-    std::env::var_os("HOME")
+    let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    std::env::var_os(var)
         .filter(|h| !h.is_empty())
         .map(PathBuf::from)
 }
 
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn config_dir() -> PathBuf {
     match std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty()) {
         Some(x) => PathBuf::from(x).join("lightshot"),
@@ -86,6 +88,25 @@ pub fn config_dir() -> PathBuf {
             .join(".config")
             .join("lightshot"),
     }
+}
+
+#[cfg(target_os = "macos")]
+pub fn config_dir() -> PathBuf {
+    home()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("Library")
+        .join("Application Support")
+        .join("lightshot")
+}
+
+#[cfg(windows)]
+pub fn config_dir() -> PathBuf {
+    std::env::var_os("APPDATA")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(home)
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("lightshot")
 }
 
 pub fn config_path() -> PathBuf {
@@ -133,11 +154,13 @@ pub fn store_to(path: &Path, cfg: &Config) -> io::Result<()> {
 
 pub fn pictures_dir() -> PathBuf {
     if let Some(home) = home() {
-        let dirs = home.join(".config").join("user-dirs.dirs");
-        if let Ok(text) = std::fs::read_to_string(dirs) {
-            if let Some(p) = parse_pictures_dir(&text, &home) {
-                if p.is_dir() {
-                    return p;
+        if cfg!(not(any(windows, target_os = "macos"))) {
+            let dirs = home.join(".config").join("user-dirs.dirs");
+            if let Ok(text) = std::fs::read_to_string(dirs) {
+                if let Some(p) = parse_pictures_dir(&text, &home) {
+                    if p.is_dir() {
+                        return p;
+                    }
                 }
             }
         }

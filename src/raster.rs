@@ -6,7 +6,18 @@ use imageproc::drawing::{
 use imageproc::rect::Rect;
 use std::sync::LazyLock;
 
-const FONT_PATH: &str = "/usr/share/fonts/TTF/DejaVuSans.ttf";
+#[cfg(not(any(windows, target_os = "macos")))]
+const FONT_PATHS: &[&str] = &[
+    "/usr/share/fonts/TTF/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+];
+#[cfg(windows)]
+const FONT_PATHS: &[&str] = &[r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\segoeui.ttf"];
+#[cfg(target_os = "macos")]
+const FONT_PATHS: &[&str] = &[
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/Library/Fonts/Arial.ttf",
+];
 pub const TEXT_PX: f32 = 20.0;
 pub const MARKER_ALPHA: u8 = 96;
 pub const MARKER_RADIUS: i32 = 7;
@@ -75,7 +86,12 @@ pub fn arrow_heads(a: [f32; 2], b: [f32; 2]) -> Option<[[f32; 2]; 2]> {
     Some([head(ARROW_HEAD_DEG), head(-ARROW_HEAD_DEG)])
 }
 
-static FONT_BYTES: LazyLock<Option<Vec<u8>>> = LazyLock::new(|| std::fs::read(FONT_PATH).ok());
+static FONT_BYTES: LazyLock<Option<Vec<u8>>> = LazyLock::new(|| {
+    FONT_PATHS
+        .iter()
+        .filter_map(|p| std::fs::read(p).ok())
+        .find(|b| FontRef::try_from_slice(b).is_ok())
+});
 static FONT: LazyLock<Option<FontRef<'static>>> =
     LazyLock::new(|| FontRef::try_from_slice(FONT_BYTES.as_deref()?).ok());
 

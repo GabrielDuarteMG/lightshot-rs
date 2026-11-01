@@ -120,6 +120,13 @@ pub struct Outcome {
 
 static PENDING: Mutex<Vec<JoinHandle<()>>> = Mutex::new(Vec::new());
 
+#[cfg(not(any(windows, target_os = "macos")))]
+const OPEN_FOLDER: &str = "xdg-open";
+#[cfg(target_os = "macos")]
+const OPEN_FOLDER: &str = "open";
+#[cfg(windows)]
+const OPEN_FOLDER: &str = "explorer";
+
 pub struct Editor {
     src: RgbaImage,
     tex: Option<egui::TextureHandle>,
@@ -212,7 +219,7 @@ fn notify_saved(path: &Path) -> Result<(), notify_rust::error::Error> {
     let t = std::thread::spawn(move || {
         handle.wait_for_action(|action| {
             if action == "open" || action == "default" {
-                let _ = std::process::Command::new("xdg-open").arg(&dir).status();
+                let _ = std::process::Command::new(OPEN_FOLDER).arg(&dir).status();
             }
         })
     });

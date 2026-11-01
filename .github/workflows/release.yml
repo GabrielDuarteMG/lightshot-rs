@@ -1,0 +1,96 @@
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: lightshot
+            asset: lightshot-linux-x86_64.tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: lightshot.exe
+            asset: lightshot-windows-x86_64.zip
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            bin: lightshot
+            asset: lightshot-macos-aarch64.tar.gz
+          - os: macos-26-intel
+            target: x86_64-apple-darwin
+            bin: lightshot
+            asset: lightshot-macos-x86_64.tar.gz
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libclang-dev libpipewire-0.3-dev libspa-0.2-dev \
+            libxcb1-dev libxcb-randr0-dev libxcb-render0-dev libgbm-dev
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+          rustup default stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: cargo test --locked --target ${{ matrix.target }}
+      - run: cargo build --locked --release --target ${{ matrix.target }}
+      - name: Pack (tar.gz)
+        if: runner.os != 'Windows'
+        run: tar -czf ${{ matrix.asset }} -C target/${{ matrix.target }}/release ${{ matrix.bin }}
+      - name: Pack (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path target/${{ matrix.target }}/release/${{ matrix.bin }} -DestinationPath ${{ matrix.asset }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'EOF'
+          Unofficial build. This is not Lightshot and is not affiliated with Skillbrains.
+
+          Assets:
+          - `lightshot-linux-x86_64.tar.gz`: Linux x86_64, contains `lightshot`
+          - `lightshot-windows-x86_64.zip`: Windows x86_64, contains `lightshot.exe`
+          - `lightshot-macos-aarch64.tar.gz`: macOS Apple Silicon, contains `lightshot`
+          - `lightshot-macos-x86_64.tar.gz`: macOS Intel, contains `lightshot`
+
+          `install-hotkey` only installs a GNOME binding. Elsewhere, bind Ctrl+Print to `lightshot capture` yourself.
+
+          The macOS binaries are unsigned and not notarized. Gatekeeper blocks them until you allow them in System Settings or run `xattr -d com.apple.quarantine lightshot`.
+          EOF
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes-file notes.md

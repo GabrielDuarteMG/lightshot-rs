@@ -4,10 +4,8 @@ mod editor;
 mod hotkey;
 mod raster;
 
-use std::borrow::Cow;
-use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions, TryLockError};
 use std::io;
-use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::time::Duration;
 
@@ -50,14 +48,10 @@ fn acquire_lock(dir: &Path) -> io::Result<Option<File>> {
         .truncate(false)
         .write(true)
         .open(dir.join("capture.lock"))?;
-    if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-        return Ok(Some(file));
-    }
-    let err = io::Error::last_os_error();
-    if err.raw_os_error() == Some(libc::EWOULDBLOCK) {
-        Ok(None)
-    } else {
-        Err(err)
+    match file.try_lock() {
+        Ok(()) => Ok(Some(file)),
+        Err(TryLockError::WouldBlock) => Ok(None),
+        Err(TryLockError::Error(e)) => Err(e),
     }
 }
 
@@ -97,7 +91,9 @@ fn run_capture() -> i32 {
 
 /// Linux clipboards are served by the owning process, so a forked child keeps
 /// the last copied image available until another client replaces it.
+#[cfg(target_os = "linux")]
 fn hold_clipboard(img: &image::RgbaImage) {
+    use std::borrow::Cow;
     let serve = || {
         use arboard::SetExtLinux;
         if let Ok(mut cb) = arboard::Clipboard::new() {
@@ -118,3 +114,7 @@ fn hold_clipboard(img: &image::RgbaImage) {
         _ => {}
     }
 }
+
+/// Windows and macOS keep the copied image after the process exits.
+#[cfg(not(target_os = "linux"))]
+fn hold_clipboard(_img: &image::RgbaImage) {}

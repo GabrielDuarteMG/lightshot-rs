@@ -1,3 +1,6 @@
+#![cfg_attr(not(target_os = "linux"), allow(dead_code))]
+
+#[cfg(target_os = "linux")]
 use std::process::Command;
 
 pub const KEYBINDING_PATH: &str =
@@ -6,10 +9,12 @@ pub const BINDING: &str = "<Ctrl>Print";
 const MEDIA_KEYS: &str = "org.gnome.settings-daemon.plugins.media-keys";
 const LIST_KEY: &str = "custom-keybindings";
 
+#[cfg(target_os = "linux")]
 fn custom_schema() -> String {
     format!("{MEDIA_KEYS}.custom-keybinding:{KEYBINDING_PATH}")
 }
 
+#[cfg(target_os = "linux")]
 fn gsettings(args: &[&str]) -> Result<String, String> {
     let out = Command::new("gsettings")
         .args(args)
@@ -51,6 +56,7 @@ fn gvariant_str(s: &str) -> String {
     format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
 }
 
+#[cfg(target_os = "linux")]
 fn shell_quote(s: &str) -> String {
     let plain = s
         .chars()
@@ -62,14 +68,17 @@ fn shell_quote(s: &str) -> String {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn read_list() -> Result<Vec<String>, String> {
     Ok(parse_list(&gsettings(&["get", MEDIA_KEYS, LIST_KEY])?))
 }
 
+#[cfg(target_os = "linux")]
 fn write_list(items: &[String]) -> Result<(), String> {
     gsettings(&["set", MEDIA_KEYS, LIST_KEY, &format_list(items)]).map(drop)
 }
 
+#[cfg(target_os = "linux")]
 pub fn install() -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
     let command = format!("{} capture", shell_quote(&exe.to_string_lossy()));
@@ -85,6 +94,7 @@ pub fn install() -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
 pub fn uninstall() -> Result<(), String> {
     let list = read_list()?;
     if list.iter().any(|p| p == KEYBINDING_PATH) {
@@ -96,6 +106,27 @@ pub fn uninstall() -> Result<(), String> {
         gsettings(&["reset", &schema, key])?;
     }
     Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn install() -> Result<(), String> {
+    Err(unsupported("install-hotkey"))
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn uninstall() -> Result<(), String> {
+    Err(unsupported("uninstall-hotkey"))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn unsupported(command: &str) -> String {
+    let exe = match std::env::current_exe() {
+        Ok(p) => p.display().to_string(),
+        Err(e) => format!("<current_exe: {e}>"),
+    };
+    format!(
+        "{command} only manages a GNOME binding. Bind Ctrl+Print to `lightshot capture` yourself in your OS settings; the command for this binary is: \"{exe}\" capture"
+    )
 }
 
 #[cfg(test)]
