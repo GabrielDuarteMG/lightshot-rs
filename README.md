@@ -2,6 +2,8 @@
 
 Linux screenshot tool. It grabs every monitor, lets you drag a region, annotate it, then copy or save. The interaction follows Lightshot. The code here was written for this repository.
 
+If every monitor reports origin 0,0, only the largest monitor is kept.
+
 This is not Lightshot and it is not affiliated with Skillbrains. Lightshot is their product and their name. Nothing here uploads to prnt.sc. This repository contains no Lightshot binary, icons, artwork, or decompiled source.
 
 The behavior was studied with [REA](https://github.com/morluto/rea), which is MIT. REA's source is not included. Running that tool does not make this program a copy of REA.
@@ -58,7 +60,7 @@ Drag to select. A toolbar sits at the bottom of the screen: Select, Pen, Line, A
 | Handles | Resize. Annotations are kept only when they still fit. |
 | Right click, Esc, Close | Quit |
 | Enter, Ctrl+C, Copy | Copy the region and quit when `auto_close` is true |
-| Ctrl+S, Save | Save dialog. Starts in `last_saved_dir` if that directory exists, otherwise the XDG Pictures directory, otherwise `~/Pictures`. |
+| Ctrl+S, Save | Save dialog. Starts in `last_saved_dir` when that path is an existing directory, otherwise the `XDG_PICTURES_DIR` path from `~/.config/user-dirs.dirs` when that path is an existing directory, otherwise `~/Pictures` when that directory exists, otherwise the current working directory. |
 | Ctrl+Z, Undo | Drop the last annotation |
 | Text, click inside the region | Type. Esc while the field is focused cancels that text. Leaving the field commits it. Ctrl+S still saves. |
 
